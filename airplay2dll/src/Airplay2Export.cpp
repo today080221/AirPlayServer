@@ -46,6 +46,20 @@ void fgServerStop(void* handle)
 	}
 }
 
+bool fgServerIsRunning(void* handle)
+{
+	return handle && static_cast<FgAirplayServer*>(handle)->isRunning();
+}
+
+bool fgServerGetPorts(void* handle, unsigned short* raopPort, unsigned short* airplayPort)
+{
+	if (!fgServerIsRunning(handle) || !raopPort || !airplayPort) return false;
+	const auto server = static_cast<FgAirplayServer*>(handle);
+	*raopPort = server->raopPort();
+	*airplayPort = server->airplayPort();
+	return true;
+}
+
 float fgServerScale(void* handle, float fRatio)
 {
 	if (handle != NULL) {

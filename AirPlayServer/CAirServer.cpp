@@ -12,16 +12,17 @@ CAirServer::CAirServer()
 
 CAirServer::~CAirServer()
 {
-    delete m_pCallback;
     stop();
+    delete m_pCallback;
 }
 
 bool getHostName(char hostName[512]) 
 {
 	WSADATA wsaData;
-	WSAStartup(MAKEWORD(2, 2), &wsaData);
+	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) return false;
 
 	gethostname(hostName, 511);
+	WSACleanup();
 	if (strlen(hostName) > 0)
 	{
 		return true;
@@ -81,4 +82,9 @@ void CAirServer::restart(const char* serverName, const char* password,
 float CAirServer::setVideoScale(float fRatio)
 {
     return fgServerScale(m_pServer, fRatio);
+}
+
+bool CAirServer::isRunning() const
+{
+    return fgServerIsRunning(m_pServer);
 }

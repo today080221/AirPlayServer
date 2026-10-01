@@ -168,9 +168,7 @@ FgAirplayServer::FgAirplayServer()
 
 FgAirplayServer::~FgAirplayServer()
 {
-	m_pCallback = NULL;
-
-	clearChannels();
+	stop();
 
 	CloseHandle(m_mutexMap);
 }
@@ -181,6 +179,10 @@ int FgAirplayServer::start(const char serverName[AIRPLAY_NAME_LEN],
 	unsigned int displayWidth, unsigned int displayHeight, bool compressedOnly)
 {
 	m_pCallback = callback;
+	if (!serverName || !callback || raopPort > 65535 || airplayPort > 65535) {
+		log_callback(this, RAOP_LOG_ERR, "Invalid startup arguments (name, callback or TCP port)");
+		return -1;
+	}
 	const char* authPassword = (password != NULL && password[0] != '\0') ? password : NULL;
 	m_compressedOnly = compressedOnly;
 
@@ -207,13 +209,13 @@ int FgAirplayServer::start(const char serverName[AIRPLAY_NAME_LEN],
 			ret = -1;
 			break;
 		}
+		airplay_set_log_level(m_pAirplay, RAOP_LOG_DEBUG);
+		airplay_set_log_callback(m_pAirplay, &log_callback, this);
 		ret = airplay_start(m_pAirplay, &airplay_port, hwaddr, sizeof(hwaddr), authPassword);
 		if (ret != 1) {
 			ret = -1;
 			break;
 		}
-		airplay_set_log_level(m_pAirplay, RAOP_LOG_DEBUG);
-		airplay_set_log_callback(m_pAirplay, &log_callback, this);
 
 		m_pRaop = hasPersistentPairingSeed
 			? raop_init_with_seed(10, &m_stRaopCB, pairingSeed.data())
@@ -233,6 +235,13 @@ int FgAirplayServer::start(const char serverName[AIRPLAY_NAME_LEN],
 			break;
 		}
 		raop_set_port(m_pRaop, raop_port);
+		// Existing external advertisers assume fixed ports. Fail closed if they
+		// cannot be honored; silently changing them would publish wrong SRV data.
+		if (externalDiscovery && (raop_port != raopPort || airplay_port != airplayPort)) {
+			log_callback(this, RAOP_LOG_ERR, "External DNS-SD requires the requested ports; refusing mismatched advertisement");
+			ret = -1;
+			break;
+		}
 		ret = 0;
 
 		if (!externalDiscovery)
@@ -260,7 +269,11 @@ int FgAirplayServer::start(const char serverName[AIRPLAY_NAME_LEN],
 	} while (false);
 
 	if (ret != 0) {
+		log_callback(this, RAOP_LOG_ERR, "Receiver startup failed; unregistering discovery and stopping all listeners");
 		stop();
+	} else {
+		m_raopPort = raop_port;
+		m_airplayPort = airplay_port;
 	}
 
 	return ret;
@@ -276,11 +289,10 @@ void FgAirplayServer::stop()
 		m_pDnsSd = NULL;
 	}
 
-	// Wait a bit to let any in-flight callbacks complete
-	// This prevents crashes from callbacks accessing destroyed objects
-	Sleep(100);
-
-	// Now destroy the servers
+	// Join producers before freeing anything reachable by callbacks. A sleep
+	// is not synchronization; callback and channels stay alive until both stop.
+	if (m_pRaop) raop_stop(m_pRaop);
+	if (m_pAirplay) airplay_stop(m_pAirplay);
 	if (m_pRaop) {
 		raop_destroy(m_pRaop);
 // 		raop_set_log_callback(m_pRaop, &log_callback, NULL);
@@ -293,14 +305,12 @@ void FgAirplayServer::stop()
 		m_pAirplay = NULL;
 	}
 
-	// Wait again to ensure all callbacks have finished
-	Sleep(100);
-
 	// Clear all channels
 	clearChannels();
 	
 	// Finally, clear the callback pointer
 	m_pCallback = NULL;
+	m_raopPort = m_airplayPort = 0;
 }
 
 float FgAirplayServer::setScale(float fRatio)

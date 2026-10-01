@@ -624,7 +624,7 @@ void CImGuiManager::RenderHomeScreen(const char* deviceName, bool isServerRunnin
 			"Open Screen Mirroring on your Apple device and choose the receiver below.");
 	} else {
 		strcpy_s(instruction, sizeof(instruction),
-			"Check that Bonjour is available, then restart the receiver.");
+			"Startup failed. Check Bonjour and port availability. Run with --debug for details, then restart.");
 	}
 	ImGui::SetCursorPos(ImVec2(contentX, headingBottom + 12.0f * scale));
 	ImGui::PushTextWrapPos(contentX + contentWidth);

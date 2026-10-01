@@ -119,6 +119,7 @@ CMakeScripts/
 # Build directories
 build/
 out/
+/dist/
 
 # Code coverage
 *.gcno

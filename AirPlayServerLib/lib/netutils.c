@@ -17,6 +17,7 @@
 #include <assert.h>
 
 #include "compat.h"
+#include "netutils.h"
 
 int
 netutils_init()
@@ -35,6 +36,7 @@ netutils_init()
 	if (LOBYTE(wsaData.wVersion) != 2 ||
 	    HIBYTE(wsaData.wVersion) != 2) {
 		/* Version mismatch, requested version not found */
+		WSACleanup();
 		return -1;
 	}
 #endif
@@ -84,6 +86,13 @@ netutils_get_address(void *sockaddr, int *length)
 int
 netutils_init_socket(unsigned short *port, int use_ipv6, int use_udp)
 {
+	return netutils_init_socket_fallback(port, use_ipv6, use_udp, 0, NULL);
+}
+
+int
+netutils_init_socket_fallback(unsigned short *port, int use_ipv6, int use_udp,
+	int allow_fallback, int *fallback_error)
+{
 	int family = use_ipv6 ? AF_INET6 : AF_INET;
 	int type = use_udp ? SOCK_DGRAM : SOCK_STREAM;
 	int proto = use_udp ? IPPROTO_UDP : IPPROTO_TCP;
@@ -95,13 +104,21 @@ netutils_init_socket(unsigned short *port, int use_ipv6, int use_udp)
 	int reuseaddr = 1;
 
 	assert(port);
+	if (fallback_error) *fallback_error = 0;
 
 	server_fd = socket(family, type, proto);
 	if (server_fd == -1) {
 		goto cleanup;
 	}
 
-	ret = setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof (reuseaddr));
+/* Windows SO_REUSEADDR can steal a port from an existing connection. */
+#ifdef WIN32
+	ret = setsockopt(server_fd, SOL_SOCKET,
+		use_udp ? SO_REUSEADDR : SO_EXCLUSIVEADDRUSE,
+		(const char *)&reuseaddr, sizeof(reuseaddr));
+#else
+	ret = setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof(reuseaddr));
+#endif
 	if (ret == -1) {
 		goto cleanup;
 	}
@@ -123,16 +140,6 @@ netutils_init_socket(unsigned short *port, int use_ipv6, int use_udp)
 #endif
 
 		socklen = sizeof(*sin6ptr);
-		ret = bind(server_fd, (struct sockaddr *)sin6ptr, socklen);
-		if (ret == -1) {
-			goto cleanup;
-		}
-
-		ret = getsockname(server_fd, (struct sockaddr *)sin6ptr, &socklen);
-		if (ret == -1) {
-			goto cleanup;
-		}
-		*port = ntohs(sin6ptr->sin6_port);
 	} else {
 		struct sockaddr_in *sinptr = (struct sockaddr_in *)&saddr;
 
@@ -142,17 +149,26 @@ netutils_init_socket(unsigned short *port, int use_ipv6, int use_udp)
 		sinptr->sin_port = htons(*port);
 
 		socklen = sizeof(*sinptr);
-		ret = bind(server_fd, (struct sockaddr *)sinptr, socklen);
-		if (ret == -1) {
-			goto cleanup;
-		}
-
-		ret = getsockname(server_fd, (struct sockaddr *)sinptr, &socklen);
-		if (ret == -1) {
-			goto cleanup;
-		}
-		*port = ntohs(sinptr->sin_port);
 	}
+	ret = bind(server_fd, (struct sockaddr *)&saddr, socklen);
+	if (ret == -1) {
+		int error = SOCKET_GET_ERROR();
+		/* Retry ONLY bind conflicts/Windows exclusive-or-reserved-port denial.
+		 * Keep this socket open: port 0 is allocated and owned atomically by bind. */
+#ifdef WIN32
+		int conflict = error == WSAEADDRINUSE || error == WSAEACCES;
+#else
+		int conflict = error == EADDRINUSE;
+#endif
+		if (!allow_fallback || use_udp || !*port || !conflict) goto cleanup;
+		if (fallback_error) *fallback_error = error;
+		if (use_ipv6) ((struct sockaddr_in6 *)&saddr)->sin6_port = 0;
+		else ((struct sockaddr_in *)&saddr)->sin_port = 0;
+		if (bind(server_fd, (struct sockaddr *)&saddr, socklen) == -1) goto cleanup;
+	}
+	if (getsockname(server_fd, (struct sockaddr *)&saddr, &socklen) == -1) goto cleanup;
+	*port = use_ipv6 ? ntohs(((struct sockaddr_in6 *)&saddr)->sin6_port)
+		: ntohs(((struct sockaddr_in *)&saddr)->sin_port);
 	return server_fd;
 
 	cleanup:

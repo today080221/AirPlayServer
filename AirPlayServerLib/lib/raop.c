@@ -761,20 +761,29 @@ raop_init_with_seed(int max_clients, raop_callbacks_t *callbacks, const unsigned
 
 	/* Validate the callbacks structure */
 	if (!callbacks->audio_process) {
+		netutils_cleanup();
 		return NULL;
 	}
 
 	/* Allocate the raop_t structure */
 	raop = calloc(1, sizeof(raop_t));
 	if (!raop) {
+		netutils_cleanup();
 		return NULL;
 	}
 
 	/* Initialize the logger */
 	raop->logger = logger_init();
+	if (!raop->logger) {
+		free(raop);
+		netutils_cleanup();
+		return NULL;
+	}
 	pairing = pairing_seed ? pairing_init_seed(pairing_seed) : pairing_init_generate();
 	if (!pairing) {
+		logger_destroy(raop->logger);
 		free(raop);
+		netutils_cleanup();
 		return NULL;
 	}
 
@@ -789,7 +798,9 @@ raop_init_with_seed(int max_clients, raop_callbacks_t *callbacks, const unsigned
 	httpd = httpd_init(raop->logger, &httpd_cbs, max_clients);
 	if (!httpd) {
 		pairing_destroy(pairing);
+		logger_destroy(raop->logger);
 		free(raop);
+		netutils_cleanup();
 		return NULL;
 	}
 	/* Copy callbacks structure */
@@ -905,7 +916,11 @@ raop_start(raop_t *raop, unsigned short *port)
 {
 	assert(raop);
 	assert(port);
-	return httpd_start(raop->httpd, port);
+	/* Publish the bound event port before httpd releases its worker mutex. */
+	raop->port = *port;
+	int result = httpd_start_dynamic(raop->httpd, &raop->port);
+	if (result == 1) *port = raop->port;
+	return result;
 }
 
 void

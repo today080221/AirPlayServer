@@ -17,7 +17,7 @@ public:
 	void stop();
 	void restart(const char* serverName, const char* password,
 		unsigned int displayWidth, unsigned int displayHeight);
-	bool isRunning() const { return m_pServer != NULL; }
+	bool isRunning() const;
 	float setVideoScale(float fRatio);
 
 private:

@@ -117,9 +117,15 @@ static int
 on_body(http_parser *parser, const char *at, size_t length)
 {
 	http_request_t *request = parser->data;
+	char *data;
+	/* Bound memory consumed by an untrusted control request. */
+	const size_t max_body = 8 * 1024 * 1024;
+	if (length > max_body - (size_t)request->datalen) return -1;
+	if (!length) return 0;
 
-	request->data = realloc(request->data, request->datalen+length);
-	assert(request->data);
+	data = realloc(request->data, request->datalen+length);
+	if (!data) return -1;
+	request->data = data;
 
 	memcpy(request->data+request->datalen, at, length);
 	request->datalen += length;

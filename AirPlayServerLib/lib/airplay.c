@@ -486,13 +486,21 @@ airplay_init_with_seed(int max_clients, airplay_callbacks_t *callbacks, const ch
 	airplay = calloc(1, sizeof(airplay_t));
 	if (!airplay)
 	{
+		netutils_cleanup();
 		return NULL;
 	}
 
 	airplay->logger = logger_init();
+	if (!airplay->logger) {
+		free(airplay);
+		netutils_cleanup();
+		return NULL;
+	}
 	pairing = pairing_seed ? pairing_init_seed(pairing_seed) : pairing_init_generate();
 	if (!pairing) {
+		logger_destroy(airplay->logger);
 		free(airplay);
+		netutils_cleanup();
 		return NULL;
 	}
 
@@ -507,15 +515,20 @@ airplay_init_with_seed(int max_clients, airplay_callbacks_t *callbacks, const ch
 	if (!httpd)
 	{
 		pairing_destroy(pairing);
+		logger_destroy(airplay->logger);
 		free(airplay);
+		netutils_cleanup();
 		return NULL;
 	}
 
 	mirror_server = httpd_init(airplay->logger, &httpd_cbs, max_clients);
 	if (!mirror_server)
 	{
-		free(httpd);
+		httpd_destroy(httpd);
+		pairing_destroy(pairing);
+		logger_destroy(airplay->logger);
 		free(airplay);
+		netutils_cleanup();
 		return NULL;
 	}
 
@@ -560,7 +573,7 @@ airplay_is_running(airplay_t *airplay)
 {
 	assert(airplay);
 
-	return httpd_is_running(airplay->httpd);
+	return httpd_is_running(airplay->httpd) && httpd_is_running(airplay->mirror_server);
 }
 
 void
@@ -609,11 +622,12 @@ int airplay_start(airplay_t *airplay, unsigned short *port, const char *hwaddr,
 	memcpy(airplay->hwaddr, hwaddr, hwaddrlen);
 	airplay->hwaddrlen = hwaddrlen;
 
-	ret = httpd_start(airplay->httpd, port);
+	ret = httpd_start_dynamic(airplay->httpd, port);
 	if (ret != 1) return ret;
 
 	mirror_port = 7100;
 	ret = httpd_start(airplay->mirror_server, &mirror_port);
+	if (ret != 1) httpd_stop(airplay->httpd);
 	return ret;
 }
 

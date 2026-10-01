@@ -45,8 +45,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         (strstr(lpCmdLine, "--debug") != NULL || strstr(lpCmdLine, "/debug") != NULL);
     if (DebugLogger::Start(lpCmdLine)) {
         std::string message = "Debug logging is enabled.\n\nLog file:\n" + DebugLogger::Path();
-        MessageBoxA(NULL, message.c_str(), "AirPlayServer - Debug Logging",
-            MB_OK | MB_ICONINFORMATION);
+        // Automation can collect the same log without a modal startup dialog.
+        if (!strstr(lpCmdLine, "--debug-quiet")) {
+            MessageBoxA(NULL, message.c_str(), "AirPlayServer - Debug Logging",
+                MB_OK | MB_ICONINFORMATION);
+        }
     }
     else if (debugRequested) {
         MessageBoxA(NULL,

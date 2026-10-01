@@ -35,6 +35,7 @@ httpd_t *httpd_init(logger_t *logger, httpd_callbacks_t *callbacks, int max_conn
 int httpd_is_running(httpd_t *httpd);
 
 int httpd_start(httpd_t *httpd, unsigned short *port);
+int httpd_start_dynamic(httpd_t *httpd, unsigned short *port);
 void httpd_stop(httpd_t *httpd);
 
 void httpd_destroy(httpd_t *httpd);

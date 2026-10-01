@@ -23,6 +23,10 @@ public:
 		unsigned int displayWidth, unsigned int displayHeight, bool compressedOnly = false);
 	void stop();
 	float setScale(float fRatio);
+	bool isRunning() const { return m_pRaop && m_pAirplay &&
+		raop_is_running(m_pRaop) && airplay_is_running(m_pAirplay); }
+	unsigned short raopPort() const { return m_raopPort; }
+	unsigned short airplayPort() const { return m_airplayPort; }
 
 protected:
 	void clearChannels();
@@ -76,5 +80,7 @@ protected:
 
 	float					m_fScaleRatio;
 	bool					m_compressedOnly;
+	unsigned short m_raopPort = 0;
+	unsigned short m_airplayPort = 0;
 	FgAirplayChannelMap		m_mapChannel;
 };

@@ -6,6 +6,7 @@
 #include <new>
 #include "CAutoLock.h"
 #include "resource.h"
+#include "DebugLogger.h"
 
 // Windows Core Audio API for querying system audio device format
 #include <mmdeviceapi.h>
@@ -714,11 +715,13 @@ void CSDLPlayer::setConnected(bool connected, const char* deviceName)
 
 void CSDLPlayer::stopServerForShutdown()
 {
+    DebugLogger::Write("shutdown", "stopping callback producers");
 	// Block new callback payloads before stopping their producer, then remove any
 	// payload already queued after the render thread's final event poll.
 	InterlockedExchange(&m_shuttingDown, 1);
 	cancelPinApproval();
 	m_server.stop();
+    DebugLogger::Write("shutdown", "callback producers stopped");
 	if (SDL_WasInit(SDL_INIT_VIDEO) != 0) {
 		SDL_FilterEvents(KeepNonConnectionStateEvents, NULL);
 	}
@@ -1322,6 +1325,7 @@ void CSDLPlayer::loopEvents()
 				break;
 			}
 			case SDL_QUIT: {
+				DebugLogger::Write("shutdown", "SDL quit received");
 				printf("Quit requested, quitting.\n");
 
 				// Save settings before shutdown
@@ -2073,7 +2077,7 @@ void CSDLPlayer::initVideo(int width, int height)
 	m_windowHeight = height;
 
 	// Create SDL2 window with resizable support and HiDPI awareness
-	m_window = SDL_CreateWindow("AirPlay Receiver",
+	m_window = SDL_CreateWindow("AirPlay Receiver (Personal)",
 		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
 		width, height,
 		SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
@@ -2636,7 +2640,7 @@ void CSDLPlayer::setPictureInPictureMode(bool enabled)
 			if (outerY < usableBounds.y) outerY = usableBounds.y;
 			SDL_SetWindowPosition(m_window, outerX + borderLeft, outerY + borderTop);
 		}
-		SDL_SetWindowTitle(m_window, "AirPlay Receiver - Picture in Picture");
+		SDL_SetWindowTitle(m_window, "AirPlay Receiver (Personal) - Picture in Picture");
 	} else {
 		m_bPictureInPicture = false;
 		applyPictureInPictureWindowShape();
@@ -2649,7 +2653,7 @@ void CSDLPlayer::setPictureInPictureMode(bool enabled)
 		if (m_pipRestoreMaximized) {
 			SDL_MaximizeWindow(m_window);
 		}
-		SDL_SetWindowTitle(m_window, "AirPlay Receiver");
+		SDL_SetWindowTitle(m_window, "AirPlay Receiver (Personal)");
 		m_windowedX = m_pipRestoreX;
 		m_windowedY = m_pipRestoreY;
 		m_windowedW = m_pipRestoreW;
@@ -3367,7 +3371,7 @@ void CSDLPlayer::showWindow()
 		SDL_RaiseWindow(m_window);
 		m_bWindowVisible = true;
 		m_bMainWindowMinimized = false;
-		SDL_SetWindowTitle(m_window, "AirPlay Receiver");
+		SDL_SetWindowTitle(m_window, "AirPlay Receiver (Personal)");
 	}
 }
 

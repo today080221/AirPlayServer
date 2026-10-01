@@ -103,7 +103,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalLibraryDirectories>$(OutDir);$(AirPlayLibOutputDir);$(ExternalDir)plist\lib\$(PlatformTarget);$(ExternalDir)ffmpeg\lib\$(PlatformTarget);C:\msys64\mingw32\lib\gcc\i686-w64-mingw32\9.2.0</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(OutDir);$(AirPlayLibOutputDir);$(ExternalDir)plist\lib\$(PlatformTarget);$(ExternalDir)ffmpeg\lib\$(PlatformTarget)</AdditionalLibraryDirectories>
       <AdditionalDependencies>ws2_32.lib;winmm.lib;libplist.a;AirPlayLib.lib;avcodec.lib;swscale.lib;avutil.lib;legacy_stdio_definitions.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
@@ -128,7 +128,7 @@ xcopy /y /e $(ExternalDir)ffmpeg\lib\$(PlatformTarget)\*.dll $(AirPlayServerDir)
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalLibraryDirectories>$(OutDir);$(AirPlayLibOutputDir);$(ExternalDir)plist\lib\$(PlatformTarget);$(ExternalDir)ffmpeg\lib\$(PlatformTarget);C:\msys64\mingw32\lib\gcc\i686-w64-mingw32\9.2.0</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(OutDir);$(AirPlayLibOutputDir);$(ExternalDir)plist\lib\$(PlatformTarget);$(ExternalDir)ffmpeg\lib\$(PlatformTarget)</AdditionalLibraryDirectories>
       <AdditionalDependencies>ws2_32.lib;winmm.lib;libplist.a;AirPlayLib.lib;avcodec.lib;swscale.lib;avutil.lib;legacy_stdio_definitions.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
@@ -157,7 +157,7 @@ xcopy /y /e $(ExternalDir)ffmpeg\lib\$(PlatformTarget)\*.dll $(AirPlayServerDir)
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalLibraryDirectories>$(OutDir);$(AirPlayLibOutputDir);$(ExternalDir)plist\lib\$(PlatformTarget);$(ExternalDir)ffmpeg\lib\$(PlatformTarget);C:\msys64\mingw32\lib\gcc\i686-w64-mingw32\9.2.0</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(OutDir);$(AirPlayLibOutputDir);$(ExternalDir)plist\lib\$(PlatformTarget);$(ExternalDir)ffmpeg\lib\$(PlatformTarget)</AdditionalLibraryDirectories>
       <AdditionalDependencies>ws2_32.lib;winmm.lib;libplist.a;AirPlayLib.lib;avcodec.lib;swscale.lib;avutil.lib;legacy_stdio_definitions.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/SAFESEH:NO %(AdditionalOptions)</AdditionalOptions>
     </Link>
@@ -187,7 +187,7 @@ xcopy /y /e $(ExternalDir)ffmpeg\lib\$(PlatformTarget)\*.dll $(AirPlayServerDir)
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalLibraryDirectories>$(OutDir);$(AirPlayLibOutputDir);$(ExternalDir)plist\lib\$(PlatformTarget);$(ExternalDir)ffmpeg\lib\$(PlatformTarget);C:\msys64\mingw32\lib\gcc\i686-w64-mingw32\9.2.0</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(OutDir);$(AirPlayLibOutputDir);$(ExternalDir)plist\lib\$(PlatformTarget);$(ExternalDir)ffmpeg\lib\$(PlatformTarget)</AdditionalLibraryDirectories>
       <AdditionalDependencies>ws2_32.lib;winmm.lib;libplist.a;AirPlayLib.lib;avcodec.lib;swscale.lib;avutil.lib;legacy_stdio_definitions.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>

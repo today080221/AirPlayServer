@@ -54,5 +54,8 @@ AIRPLAYSERVER_API void* fgServerStartHeadless(const char serverName[AIRPLAY_NAME
 	unsigned int raopPort, unsigned int airplayPort,
 	IAirServerCallback* callback);
 AIRPLAYSERVER_API void fgServerStop(void* handle);
+// Valid only while the handle is owned by the caller, before fgServerStop.
+AIRPLAYSERVER_API bool fgServerGetPorts(void* handle, unsigned short* raopPort, unsigned short* airplayPort);
+AIRPLAYSERVER_API bool fgServerIsRunning(void* handle);
 
 AIRPLAYSERVER_API float fgServerScale(void* handle, float fRatio);

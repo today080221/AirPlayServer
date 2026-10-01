@@ -82,6 +82,15 @@ httpd_init(logger_t *logger, httpd_callbacks_t *callbacks, int max_connections)
 	/* Initial status joined */
 	httpd->running = 0;
 	httpd->joined = 1;
+	httpd->server_fd4 = httpd->server_fd6 = -1;
+	MUTEX_CREATE(httpd->run_mutex);
+#ifdef WIN32
+	if (!httpd->run_mutex) {
+		free(httpd->connections);
+		free(httpd);
+		return NULL;
+	}
+#endif
 
 	return httpd;
 }
@@ -91,6 +100,7 @@ httpd_destroy(httpd_t *httpd)
 {
 	if (httpd) {
 		httpd_stop(httpd);
+		MUTEX_DESTROY(httpd->run_mutex);
 
 		free(httpd->connections);
 		free(httpd);
@@ -144,6 +154,16 @@ httpd_accept_connection(httpd_t *httpd, int server_fd, int is_ipv6)
 		/* FIXME: Error happened */
 		return -1;
 	}
+	/* A peer that never reads must not hold shutdown in send() forever. */
+#ifdef WIN32
+	{
+		DWORD timeout = 2000;
+		if (setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (const char *)&timeout, sizeof(timeout)) != 0) {
+			closesocket(fd);
+			return 0;
+		}
+	}
+#endif
 
 	local_saddrlen = sizeof(local_saddr);
 	ret = getsockname(fd, (struct sockaddr *)&local_saddr, &local_saddrlen);
@@ -320,7 +340,7 @@ httpd_thread(void *arg)
 					written = 0;
 					while (written < datalen) {
 						ret = send(connection->socket_fd, data+written, datalen-written, 0);
-						if (ret == -1) {
+						if (ret <= 0) {
 							/* FIXME: Error happened */
 							logger_log(httpd->logger, LOGGER_INFO, "Error in sending data");
 							break;
@@ -366,15 +386,21 @@ httpd_thread(void *arg)
 	}
 
 	logger_log(httpd->logger, LOGGER_INFO, "Exiting HTTP thread: %d", httpd->thread);
+	MUTEX_LOCK(httpd->run_mutex);
+	httpd->running = 0;
+	MUTEX_UNLOCK(httpd->run_mutex);
 
 	return 0;
 }
 
-int
-httpd_start(httpd_t *httpd, unsigned short *port)
+static int
+httpd_start_internal(httpd_t *httpd, unsigned short *port, int allow_fallback)
 {
 	/* How many connection attempts are kept in queue */
 	int backlog = 5;
+	int fallback_error = 0;
+	unsigned short preferred_port = *port;
+	unsigned short bound_port = *port;
 
 	assert(httpd);
 	assert(port);
@@ -382,44 +408,55 @@ httpd_start(httpd_t *httpd, unsigned short *port)
 	MUTEX_LOCK(httpd->run_mutex);
 	if (httpd->running || !httpd->joined) {
 		MUTEX_UNLOCK(httpd->run_mutex);
-		return 0;
+		return -3;
 	}
 
-	httpd->server_fd4 = netutils_init_socket(port, 0, 0);
+	httpd->server_fd4 = netutils_init_socket_fallback(&bound_port, 0, 0,
+		allow_fallback, &fallback_error);
 	if (httpd->server_fd4 == -1) {
-		logger_log(httpd->logger, LOGGER_ERR, "Error initialising socket %d", SOCKET_GET_ERROR());
+		logger_log(httpd->logger, LOGGER_ERR, "TCP socket/bind failed: requested=%u error=%d", preferred_port, SOCKET_GET_ERROR());
 		MUTEX_UNLOCK(httpd->run_mutex);
 		return -1;
 	}
-	httpd->server_fd6 = -1;/*= netutils_init_socket(port, 1, 0);
-	if (httpd->server_fd6 == -1) {
-		logger_log(httpd->logger, LOGGER_WARNING, "Error initialising IPv6 socket %d", SOCKET_GET_ERROR());
-		logger_log(httpd->logger, LOGGER_WARNING, "Continuing without IPv6 support");
-	}*/
+	httpd->server_fd6 = -1;
 
 	if (httpd->server_fd4 != -1 && listen(httpd->server_fd4, backlog) == -1) {
-		logger_log(httpd->logger, LOGGER_ERR, "Error listening to IPv4 socket");
+		logger_log(httpd->logger, LOGGER_ERR, "TCP listen failed: port=%u error=%d", bound_port, SOCKET_GET_ERROR());
 		closesocket(httpd->server_fd4);
-		closesocket(httpd->server_fd6);
+		httpd->server_fd4 = -1;
 		MUTEX_UNLOCK(httpd->run_mutex);
 		return -2;
 	}
-	if (httpd->server_fd6 != -1 && listen(httpd->server_fd6, backlog) == -1) {
-		logger_log(httpd->logger, LOGGER_ERR, "Error listening to IPv6 socket");
-		closesocket(httpd->server_fd4);
-		closesocket(httpd->server_fd6);
-		MUTEX_UNLOCK(httpd->run_mutex);
-		return -2;
-	}
-	logger_log(httpd->logger, LOGGER_INFO, "Initialized server socket(s)");
 
 	/* Set values correctly and create new thread */
 	httpd->running = 1;
 	httpd->joined = 0;
 	THREAD_CREATE(httpd->thread, httpd_thread, httpd);
+	if (!httpd->thread) {
+		logger_log(httpd->logger, LOGGER_ERR, "TCP worker creation failed on port %u", bound_port);
+		httpd->running = 0;
+		httpd->joined = 1;
+		closesocket(httpd->server_fd4);
+		httpd->server_fd4 = -1;
+		MUTEX_UNLOCK(httpd->run_mutex);
+		return -3;
+	}
+	*port = bound_port;
+	logger_log(httpd->logger, LOGGER_INFO, "TCP listening: requested=%u actual=%u fallback_error=%d",
+		preferred_port, bound_port, fallback_error);
 	MUTEX_UNLOCK(httpd->run_mutex);
 
 	return 1;
+}
+
+int httpd_start(httpd_t *httpd, unsigned short *port)
+{
+	return httpd_start_internal(httpd, port, 0);
+}
+
+int httpd_start_dynamic(httpd_t *httpd, unsigned short *port)
+{
+	return httpd_start_internal(httpd, port, 1);
 }
 
 int
@@ -430,7 +467,7 @@ httpd_is_running(httpd_t *httpd)
 	assert(httpd);
 
 	MUTEX_LOCK(httpd->run_mutex);
-	running = httpd->running || !httpd->joined;
+	running = httpd->running;
 	MUTEX_UNLOCK(httpd->run_mutex);
 
 	return running;
@@ -442,23 +479,15 @@ httpd_stop(httpd_t *httpd)
 	assert(httpd);
 
 	MUTEX_LOCK(httpd->run_mutex);
-	if (!httpd->running || httpd->joined) {
+	if (httpd->joined) {
 		MUTEX_UNLOCK(httpd->run_mutex);
 		return;
 	}
 	logger_log(httpd->logger, LOGGER_INFO, "Stopping server socket..., %d", httpd->thread);
 	httpd->running = 0;
 
-	if (httpd->server_fd4 != -1) {
-		shutdown(httpd->server_fd4, SHUT_RDWR);
-		closesocket(httpd->server_fd4);
-		httpd->server_fd4 = -1;
-	}
-	if (httpd->server_fd6 != -1) {
-		shutdown(httpd->server_fd6, SHUT_RDWR);
-		closesocket(httpd->server_fd6);
-		httpd->server_fd6 = -1;
-	}
+	/* The worker owns/closes sockets. Cross-thread close races with select/accept
+	 * and can close a recycled socket handle during a rapid restart. */
 	MUTEX_UNLOCK(httpd->run_mutex);
 
 	THREAD_JOIN(httpd->thread);

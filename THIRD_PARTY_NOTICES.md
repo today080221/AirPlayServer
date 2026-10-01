@@ -1,5 +1,25 @@
 # Third-Party Notices
 
+## Personal desktop package
+
+This fork's Windows x64 desktop ZIP is a personal modification based on upstream
+v1.2.5. It includes SDL2 (zlib license), Dear ImGui 1.92.5 (MIT), the compiled
+Bonjour client library (not the Bonjour service installer), and application-local
+Microsoft Visual C++ release runtime files. Their notices are included under
+`licenses/`. Apple source notices are extracted from the exact compiled source
+files. The Microsoft runtime remains subject to Microsoft's redistribution terms;
+its installed `Redist.txt` is included. Windows and the Bonjour service are
+prerequisites. No MSYS2 runtime is needed by the inspected x64 PE imports.
+
+The matching fork source ZIP is delivered beside the binary ZIP. Exact source
+revision, source URL, baseline and runtime version are in `BUILD-INFO.json`.
+The FFmpeg source URL/checksum and rebuild instructions below remain applicable;
+vendored DLLs were reused without rebuilding FFmpeg or SDL2.
+
+- SDL2 source: <https://github.com/libsdl-org/SDL/tree/release-2.30.12>
+- ImGui source/license: <https://github.com/ocornut/imgui/tree/v1.92.5>
+- Microsoft redistribution terms: <https://learn.microsoft.com/en-us/visualstudio/releases/2026/redistribution>
+
 The release runtime contains open-source components in addition to code covered
 by the repository's MIT license.
 

@@ -1,5 +1,8 @@
 # AirPlayServer for Windows
 
+> **个人修改版 / Personal fork**：基于上游 v1.2.5，加入 Windows RAOP/AirPlay 端口冲突自动回退及退出清理修复。
+> 中文使用、构建和打包说明见 [PERSONAL-BUILD](docs/PERSONAL-BUILD.zh-CN.md)，检查结论与验收边界见 [SOURCE-REVIEW](docs/SOURCE-REVIEW.zh-CN.md)。以下其余内容保留上游介绍。
+
 AirPlayServer receives AirPlay video, audio, and screen mirroring on Windows.
 
 This project is an updated fork of [fingergit/airplay2-win](https://github.com/fingergit/airplay2-win).
